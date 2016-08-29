@@ -1,0 +1,24 @@
+{
+  "name": "koovdev_device",
+  "version": "1.0.0",
+  "description": "koov device management",
+  "main": "koovdev_device.js",
+  "scripts": {
+    "test": "./node_modules/.bin/istanbul cover ./node_modules/.bin/_mocha -- --recursive -R spec -r should",
+    "posttest": "./node_modules/.bin/istanbul check-coverage && rm -rf coverage"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "noble-device": "latest",
+    "debug": "latest",
+    "async": "latest",
+    "serialport": "^3.0.0"
+  },
+  "devDependencies": {
+    "nodeunit": "latest",
+    "mocha": "latest",
+    "istanbul": "latest",
+    "should": "latest"
+  }
+}
