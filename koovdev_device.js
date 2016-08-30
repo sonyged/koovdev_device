@@ -141,6 +141,13 @@ function Device_BTS01(opts)
     });
   };
   this.reset_koov = reset_koov;
+  this.serial_write = function(data, cb) {
+    this.dev.write(data, cb);
+  };
+  this.on = function(what, cb) {
+    debug('ble.on ${what}:', cb);
+    this.dev.on(what, cb);
+  };
   this.program_sketch = (buffer, callback, progress) => {
     debug('program_sketch');
     this.close((err) => {
@@ -255,6 +262,23 @@ function Device_USB(opts)
   this.board = null;
   this.action = null;
   this.serial = null;
+  this.open_device = (cb) => {
+    const serialport = require('serialport');
+    debug(`open_device: ${this.name}`);
+    const sp = new serialport.SerialPort(this.name, {
+      baudrate: 115200,
+      parser: serialport.parsers.raw
+    }, false);
+    this.serial = sp;
+    sp.on('disconnect', (err) => {
+      debug(`stk500v2: ${this.name}: disconnected`, err);
+      return cb(err);
+    });
+    sp.open((err) => {
+      debug(`open_device: ${this.name}:`, err);
+      return cb(err);
+    });
+  };
   this.open = function(cb) {
     debug('usb open');
     if (is_bootdev(this.dev))
@@ -330,6 +354,13 @@ function Device_USB(opts)
         });
       });
     });
+  };
+  this.serial_write = function(data, cb) {
+    this.serial.write(data, cb);
+  };
+  this.on = function(what, cb) {
+    debug('usb.on ${what}:', cb);
+    this.serial.on(what, cb);
   };
   this.reset_koov = touch1200;
   this.program_sketch = (buffer, callback, progress) => {
@@ -451,6 +482,7 @@ function Device()
   })();
   const find_device = (obj, callback) => {
     let id = '?';
+    debug('find_device', obj);
     if (typeof obj === 'object') {
       this.device = this.candidates.find(x => x.id === obj.id);
       id = `id: ${obj.id}`;
@@ -467,6 +499,10 @@ function Device()
     }
     return true;
   };
+  this.find_device = (obj, cb) => {
+    if (find_device(obj, cb))
+      return cb(null);
+  }
   this.open = function(name, cb, err) {
     const open = (err) => {
       if (err)
@@ -483,6 +519,28 @@ function Device()
       device.close(cb);
     } else
       cb(null);
+  };
+  this.serial_open = function(cb) {
+    if (!this.device)
+      return cb('device is not found');
+    this.device.open_device(cb);
+  };
+  this.serial_write = function(data, cb) {
+    if (!this.device)
+      return cb('device is not found');
+    this.device.serial_write(data, (err) => {
+      debug('device.serial_write: done', err, data);
+      cb(err);
+    });
+  };
+  this.serial_event = function(what, cb, notify) {
+    if (!this.device)
+      return cb('device is not open');
+    this.device.on(what.substring('serial-event:'.length), (arg) => {
+      debug(`${what}:`, arg);
+      notify(arg);
+    });
+    cb(null);
   };
   this.reset_koov = function(cb) {
     if (!this.device)
