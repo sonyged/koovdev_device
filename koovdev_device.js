@@ -148,9 +148,9 @@ function Device_BTS01(opts)
       debug('reset_koov', err);
       if (err)
         return cb(err);
-      this.dev.on('disconnect', () => {
-        debug('reset_koov: ignore disconnected');
-      });
+      const handler = () => { debug('reset_koov: ignore disconnected'); };
+      this.dev.on('disconnect', handler);
+      this.listeners.push({ name: 'disconnect', handler: handler });
       this.dev.writeGPIO(new Buffer([1, 0]), (err) => {
         debug('reset_koov: write 1, 0', err);
         setTimeout(() => {
@@ -194,63 +194,6 @@ function Device_BTS01(opts)
     if (!this.serial)
       return cb({ msg: 'no serial device' });
     this.serial.on(what, cb);
-  };
-  this.program_sketch = (buffer, callback, progress) => {
-    debug('program_sketch');
-    this.close((err) => {
-      debug('program_sketch: close', err);
-      if (err)
-        return callback(err);
-      this.reset_koov((err) => {
-        debug('program_sketch: reset', err);
-        if (err)
-          return callback(err);
-        const stk500v2 = require('avrgirl-stk500v2');
-        debug(`stk500v2: ${this.name}`);
-        /*
-         * Write with dividing into 20 byte chunks.
-         */
-        const ble_write = (data, callback) => {
-          let length = data.length;
-          if (length > 20)
-            length = 20;
-          debug('write!', data);
-          this.serial.write(data.slice(0, length), err => {
-            data = data.slice(length);
-            debug('write! complete', data);
-            if (data.length > 0)
-              return ble_write(data, callback);
-            else {
-              debug('write done!');
-              callback();
-            }
-          });
-        };
-        /*
-         * ble serial wrapper for stk500v2 module.
-         */
-        let bleWrap = {
-          path: 'dummy',        // this is necessary.
-          open: (callback) => { this.open_device(callback); },
-          on: (what, callback) => { this.serial.on(what, callback); },
-          close: (callback) => { this.close(callback); },
-          write: ble_write,
-          drain: (callback) => { debug('drain called'); callback(null); },
-        };
-        const options = {
-          comm: bleWrap,
-          chip: atmega2560,
-          frameless: false,
-          debug: true
-        };
-        const stk = new stk500v2(options);
-        program_sketch(stk, buffer, (err) => {
-          this.close((close_err) => {
-            callback(err || close_err);
-          });
-        }, progress);
-      });
-    });
   };
 }
 
@@ -422,43 +365,6 @@ function Device_USB(opts)
     this.serial.on(what, cb);
   };
   this.reset_koov = touch1200;
-  this.program_sketch = (buffer, callback, progress) => {
-    debug('program_sketch');
-    this.close((err) => {
-      debug('program_sketch: close', err);
-      if (err)
-        return callback(err);
-      this.reset_koov((err) => {
-        debug('program_sketch: reset', err);
-        if (err)
-          return callback(err);
-        const stk500v2 = require('avrgirl-stk500v2');
-        debug(`stk500v2: ${this.name}`);
-        const serialport = require('serialport');
-        const sp = new serialport.SerialPort(this.name, {
-          baudrate: 115200,
-          parser: serialport.parsers.raw
-        }, false);
-        sp.on('disconnect', (err) => {
-          debug(`stk500v2: ${this.name}: disconnected`, err);
-          callback(err);
-        });
-        const options = {
-          comm: sp,
-          chip: atmega2560,
-          frameless: false,
-          debug: false
-        };
-        const stk = new stk500v2(options);
-        program_sketch(stk, buffer, (err) => {
-          debug(`stk500v2: ${this.name}: program_sketch`, err);
-          sp.close((close_err) => {
-            callback(err || close_err);
-          });
-        }, progress);
-      });
-    });
-  };
 }
 
 function scan_usb(cb, timeout)
@@ -608,16 +514,6 @@ function Device()
   };
   this.action = function() {
     return this.device ? this.device.action : null;
-  };
-  this.program_sketch = (name, sketch, callback, progress) => {
-    const intelhex = require('intel-hex');
-    const buffer = intelhex.parse(sketch).data;
-    this.close(err => {
-      if (err)
-        return callback(err);
-      if (find_device(name, callback))
-        this.device.program_sketch(buffer, callback, progress);
-    });
   };
 };
 
