@@ -269,12 +269,6 @@ function Device_USB(opts)
       parser: serialport.parsers.raw
     }, false);
     this.serial = sp;
-    const handler = (err) => {
-      debug(`stk500v2: ${this.name}: disconnected`, err);
-      return cb(err);
-    };
-    sp.on('disconnect', handler);
-    this.listeners.push({ name: 'disconnect', handler: handler });
     sp.open((err) => {
       debug(`open_device: ${this.name}:`, err);
       return cb(err);
@@ -341,7 +335,9 @@ function Device_USB(opts)
       });
     };
     const times = (count, timeout, cb) => {
-      const cont = () => { setTimeout(() => { cb(--count, cont); }, timeout); };
+      const cont = () => {
+        setTimeout(() => { cb(--count, cont); }, timeout);
+      };
       return cont();
     };
     find_bootloader(() => {
