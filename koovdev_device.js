@@ -8,6 +8,53 @@ const debug = require('debug')('koovdev_device');
  * Device management
  */
 
+const KOOVDEV_DEVICE_ERROR = 0xfe;
+
+const DEVICE_NO_ERROR = 0x00;
+const DEVICE_UNKNOWN_DEVICE = 0x01;
+const DEVICE_NO_DEVICE = 0x02;
+
+const BLE_NO_ERROR = 0x10;
+const BLE_WRITE_ERROR = 0x11;
+const BLE_DISCONNECT_ERROR = 0x12;
+const BLE_CONNECT_ERROR = 0x13;
+const BLE_GPIO_ERROR = 0x14;
+const BLE_NO_DEVICE = 0x15;
+
+const USB_NO_ERROR = 0x20;
+const USB_OPEN_ERROR = 0x21;
+const USB_CLOSE_ERROR = 0x22;
+const USB_LIST_ERROR = 0x23;
+const USB_NO_BOOTLOADER = 0x24;
+const USB_WRITE_ERROR = 0x25;
+
+const error_p = (err) => {
+  if (!err)
+    return false;
+  if (typeof err === 'object')
+    return !!err.error;
+  return true;
+};
+
+const make_error = (tag, err) => {
+  if (tag === DEVICE_NO_ERROR ||
+      tag === BLE_NO_ERROR ||
+      tag === USB_NO_ERROR)
+    return err;
+  if (typeof err === 'string')
+    err = { msg: err };
+  if (typeof err !== 'object')
+    err = { msg: 'unknown error', original_error: err };
+  err.error = true;
+  if (!err.error_code)
+    err.error_code = ((KOOVDEV_DEVICE_ERROR << 8) | tag) & 0xffff;
+  return err;
+};
+
+const error = (tag, err, cb) => {
+  return cb(make_error(tag, err));
+};
+
 const BLE_OPTS = {
   BTS01: {
     service_id: '55df0001a9b011e3a5e2000190f08f1e',
@@ -62,8 +109,15 @@ function Device_BTS01(opts)
   this.type = 'ble';
   this.name = opts.name;
   this.friendly_name = opts.name + ' (' + opts.periph.address + ')';
+  /*
+   * Underlying device.
+   */
   this.dev = opts.dev;
   this.periph = opts.periph;
+  /*
+   * Wrapper object to emulate serial device.
+   */
+  this.serial = null;
   this.board = null;
   this.action = null;
   this.listeners = [];
@@ -74,7 +128,7 @@ function Device_BTS01(opts)
     if (this.write_callback) {
       const callback = this.write_callback;
       this.write_callback = null;
-      return callback(err);
+      return error(err ? BLE_WRITE_ERROR : BLE_NO_ERROR, err, callback);
     }
   };
   const cleanup = () => {
@@ -88,18 +142,20 @@ function Device_BTS01(opts)
     debug('open ble');
     if (this.serial) {
       debug('open ble: already open');
-      return cb(null);
+      return error(BLE_NO_ERROR, null, cb);
     }
     this.serial = {
       close: (cb) => {
-        this.dev.disconnect(cb);
+        this.dev.disconnect((err) => {
+          return error(err ? BLE_DISCONNECT_ERROR : BLE_NO_ERROR, err, cb);
+        });
       },
       write: (data, cb) => {
         //debug('writing', data);
         this.dev.write(data, (err) => {
           //debug('write done', err, data);
           if (cb)
-            cb(err);
+            return error(err ? BLE_WRITE_ERROR : BLE_NO_ERROR, err, cb);
         });
       },
       on: (type, cb) => {
@@ -109,13 +165,16 @@ function Device_BTS01(opts)
             debug('disconnected');
             cleanup();
             done({ msg: 'write failure: disconnected' });
-            cb();
+            return error(BLE_NO_ERROR, null, cb);
           };
           this.dev.on('disconnect', handler);
           this.listeners.push({ name: 'disconnect', handler: handler });
           return;
         }
         if (type === 'data') {
+          /*
+           * cb is data callback.
+           */
           this.dev.read(cb);
           this.listeners.push({ name: 'data', handler: cb });
           return;
@@ -125,7 +184,7 @@ function Device_BTS01(opts)
     };
     this.dev.connectAndSetUp((err) => {
       debug(`connectAndSetUp: ${err}`);
-      return cb(err);
+      return error(err ? BLE_CONNECT_ERROR : BLE_NO_ERROR, err, cb);
     });
   };
   this.open = (cb) => {
@@ -140,19 +199,21 @@ function Device_BTS01(opts)
       cleanup();
       serial.close((err) => { cb(err); });
     } else {
-      return cb(null);
+      return error(BLE_NO_ERROR, null, cb);
     }
   };
   const reset_koov = (cb) => {
     this.open_device((err) => {
       debug('reset_koov', err);
-      if (err)
+      if (error_p(err))
         return cb(err);
       const handler = () => { debug('reset_koov: ignore disconnected'); };
       this.dev.on('disconnect', handler);
       this.listeners.push({ name: 'disconnect', handler: handler });
       this.dev.writeGPIO(new Buffer([1, 0]), (err) => {
         debug('reset_koov: write 1, 0', err);
+        if (err)                // err is BLE error.
+          return error(BLE_GPIO_ERROR, err, cb);
         setTimeout(() => {
           this.dev.writeGPIO(new Buffer([1, 2]), (err) => {
             debug('reset_koov: write 1, 2', err);
@@ -182,7 +243,7 @@ function Device_BTS01(opts)
         length = 20;
       this.serial.write(data.slice(0, length), err => {
         data = data.slice(length);
-        if (!err && data.length > 0)
+        if (!error_p(err) && data.length > 0)
           return write20(data, callback);
         return callback(err);
       });
@@ -192,7 +253,7 @@ function Device_BTS01(opts)
   this.on = function(what, cb) {
     debug(`ble.on ${what}:`, cb);
     if (!this.serial)
-      return cb({ msg: 'no serial device' });
+      return error(BLE_NO_DEVICE, { msg: 'no serial device' }, cb);
     this.serial.on(what, cb);
   };
 }
@@ -271,7 +332,7 @@ function Device_USB(opts)
     this.serial = sp;
     sp.open((err) => {
       debug(`open_device: ${this.name}:`, err);
-      return cb(err);
+      return error(err ? USB_OPEN_ERROR : USB_NO_ERROR, err, cb);
     });
   };
   this.open = function(cb) {
@@ -289,7 +350,7 @@ function Device_USB(opts)
     this.serial = serial;
     serial.open((err) => {
       debug('serial open', err);
-      return cb(err);
+      return error(err ? USB_OPEN_ERROR : USB_NO_ERROR, err, cb);
     });
   };
   this.close = function(cb) {
@@ -297,9 +358,9 @@ function Device_USB(opts)
     if (this.serial) {
       const serial = this.serial;
       cleanup();
-      serial.close(() => { cb(null); });
+      serial.close(() => { return error(USB_NO_ERROR, null, cb); });
     } else
-      cb(null);
+      return error(USB_NO_ERROR, null, cb);
   };
   const touch1200 = (cb) => {
     const serialport = require('serialport');
@@ -313,9 +374,11 @@ function Device_USB(opts)
       }, false);
       sp.open((err) => {
         debug('touch1200: open', err);
-        if (err && !err.message.match(/error code 31/))
-          return cb(err);
-        sp.close(cb);
+        if (err && !err.message.match(/error code 31/)) // err is USB error.
+          return error(USB_OPEN_ERROR, err, cb);
+        sp.close((err) => {
+          return error(err ? USB_CLOSE_ERROR : USB_NO_ERROR, err, cb);
+        });
       });
     };
     /*
@@ -323,13 +386,14 @@ function Device_USB(opts)
      */
     const find_bootloader = (cont) => {
       serialport.list((err, ports) => {
-        if (err) return cb(err);
+        if (err)                // err is USB error.
+          return error(USB_LIST_ERROR, err, cb);
         const port = ports.find(is_bootdev);
         if (port) {
           let name = port.comName;
           debug(`switch device from ${this.name} to ${name}`);
           this.name = name;
-          return cb(null);
+          return error(USB_NO_ERROR, null, cb);
         }
         return cont();
       });
@@ -345,7 +409,9 @@ function Device_USB(opts)
         times(50, 100, (count, cont) => {
           find_bootloader(() => {
             if (count <= 0)
-              return cb('no bootloader device found');
+              return error(USB_NO_BOOTLOADER, {
+                msg: 'no bootloader device found'
+              }, cb);
 	    cont();
 	  });
         });
@@ -353,7 +419,9 @@ function Device_USB(opts)
     });
   };
   this.serial_write = function(data, cb) {
-    this.serial.write(data, cb);
+    this.serial.write(data, (err) => {
+      return error(err ? USB_WRITE_ERROR : USB_NO_ERROR, err, cb);
+    });
   };
   this.on = function(what, cb) {
     debug('usb.on ${what}:', cb);
@@ -391,7 +459,7 @@ function Device()
 {
   this.candidates = [];
   this.device = null;
-  this.list = function() {
+  this.list = () => {
     return this.candidates.map(x => {
       let v = { id: x.id, type: x.type, name: x.name };
       if (x.type === 'ble') {
@@ -410,23 +478,21 @@ function Device()
       { type: 'ble', done: false, error: null, result: [] },
       { type: 'usb', done: false, error: null, result: [] }
     ];
-    this.start_scan = function(cb, timeout) {
+    this.start_scan = (cb, timeout) => {
       if (!timeout)
         timeout = 1000;
-      var callback = (type, err, result) => {
-        var x = complete.find(x => { return x.type === type; });
+      const callback = (type, err, result) => {
+        let x = complete.find(x => x.type === type);
 
         x.error = err;
         x.result = result;
         x.done = true;
-        if (complete.every(x => { return x.done; })) {
-          var e = complete.reduce((acc, x) => {
-            return acc || x.error; }, null);
-          var r = complete.reduce((acc, x) => {
-            return acc.concat(x.result); }, []);
+        if (complete.every(x => x.done)) {
+          const e = complete.reduce((acc, x) => acc || x.error, null);
+          const r = complete.reduce((acc, x) => acc.concat(x.result), []);
 
           this.candidates = r;
-          cb(e);
+          return error(DEVICE_NO_ERROR, null, (err) => { return cb(e); });
         }
       };
 
@@ -455,18 +521,18 @@ function Device()
       id = `name: ${name}`;
     }
     if (!this.device) {
-      callback({msg: `no such device: ${id}`});
+      error(DEVICE_UNKNOWN_DEVICE, {msg: `no such device: ${id}`}, callback);
       return false;
     }
     return true;
   };
   this.find_device = (obj, cb) => {
     if (find_device(obj, cb))
-      return cb(null);
+      return error(DEVICE_NO_ERROR, null, cb);
   }
   this.open = function(name, cb, err) {
     const open = (err) => {
-      if (err)
+      if (error_p(err))
         return cb(err);
       if (find_device(name, cb))
         this.device.open(cb);
@@ -479,16 +545,16 @@ function Device()
       this.device = null;
       device.close(cb);
     } else
-      cb(null);
+      return error(DEVICE_NO_ERROR, null, cb);
   };
   this.serial_open = function(cb) {
     if (!this.device)
-      return cb('device is not found');
+      return error(DEVICE_NO_DEVICE, { msg: 'device is not found' }, cb);
     this.device.open_device(cb);
   };
   this.serial_write = function(data, cb) {
     if (!this.device)
-      return cb('device is not found');
+      return error(DEVICE_NO_DEVICE, { msg: 'device is not found' }, cb);
     this.device.serial_write(data, (err) => {
       //debug('device.serial_write: done', err, data);
       cb(err);
@@ -496,16 +562,16 @@ function Device()
   };
   this.serial_event = function(what, cb, notify) {
     if (!this.device)
-      return cb('device is not open');
+      return error(DEVICE_NO_DEVICE, { msg: 'device is not open' }, cb);
     this.device.on(what.substring('serial-event:'.length), (arg) => {
       debug(`${what}:`, arg);
       notify(arg);
     });
-    cb(null);
+    return error(DEVICE_NO_ERROR, null, cb);
   };
   this.reset_koov = function(cb) {
     if (!this.device)
-      return cb('device is not open');
+      return error(DEVICE_NO_DEVICE, { msg: 'device is not open' }, cb);
     return this.device.reset_koov(cb);
   };
   this.action = function() {
