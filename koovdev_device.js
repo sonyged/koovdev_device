@@ -358,7 +358,10 @@ function Device_USB(opts)
     if (this.serial) {
       const serial = this.serial;
       cleanup();
-      serial.close(() => { return error(USB_NO_ERROR, null, cb); });
+      serial.close((err) => {
+        debug('close: serial.close', err);
+        return error(USB_NO_ERROR, null, cb);
+      });
     } else
       return error(USB_NO_ERROR, null, cb);
   };
