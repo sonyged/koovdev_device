@@ -389,7 +389,7 @@ function Device_USB(opts)
       });
     };
     /*
-     * List seriali device file and find bootloader in it.
+     * List serial device file and find bootloader in it.
      */
     const find_bootloader = (cont) => {
       serialport.list((err, ports) => {
@@ -400,7 +400,12 @@ function Device_USB(opts)
           let name = port.comName;
           debug(`switch device from ${this.name} to ${name}`);
           this.name = name;
-          return error(USB_NO_ERROR, null, cb);
+          // Add small delay after finding bootloader device.  OSX
+          // sometimes fails to open bootloader device without this
+          // delay.
+          setTimeout(() => {
+            return error(USB_NO_ERROR, { error: false, name: name }, cb);
+          }, 100);
         }
         return cont();
       });
