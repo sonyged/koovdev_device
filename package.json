@@ -1,6 +1,6 @@
 {
   "name": "koovdev_device",
-  "version": "1.0.74",
+  "version": "1.0.75",
   "description": "koov device management",
   "main": "koovdev_device.js",
   "scripts": {

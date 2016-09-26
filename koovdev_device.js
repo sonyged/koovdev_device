@@ -270,14 +270,16 @@ function scan_ble(cb, timeout) {
   const discoverCallback = dev => {
     debug('discoverAll', dev);
     const name = dev._peripheral.advertisement.localName;
-    if (!found.find(x => { return x.dev.id === dev.id; }))
+    if (!found.find(x => x.dev.id === dev.id))
       found.push({ name: name, dev: dev, periph: dev._peripheral });
   };
   KoovBle.discoverAll(discoverCallback);
 
   setTimeout(() => {
     KoovBle.stopDiscoverAll(discoverCallback);
-    cb('ble', null, found.map(x => { return new Device_BTS01(x); }));
+    cb('ble', null, found.sort((a, b) => {
+      return a.dev.id < b.dev.id ? -1 : a.dev.id > b.dev.id ? 1 : 0;
+    }).map(x => new Device_BTS01(x)));
   }, timeout);
 }
 
