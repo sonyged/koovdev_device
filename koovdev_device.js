@@ -403,7 +403,7 @@ function Device_USB(opts)
           // Add small delay after finding bootloader device.  OSX
           // sometimes fails to open bootloader device without this
           // delay.
-          setTimeout(() => {
+          return setTimeout(() => {
             return error(USB_NO_ERROR, { error: false, name: name }, cb);
           }, 100);
         }
