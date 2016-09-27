@@ -163,6 +163,10 @@ function Device_BTS01(opts)
       on: (type, cb) => {
         debug('ble.on', type);
         if (type === 'close' || type === 'disconnect') {
+          if (this.listeners.find(x => x.name === 'disconnect')) {
+            debug('ble.on ${type}: disconnected handler already installed');
+            return;
+          }
           let handler = () => {
             debug('disconnected');
             cleanup();
