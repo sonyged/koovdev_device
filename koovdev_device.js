@@ -3,6 +3,7 @@
 
 'use strict';
 const debug = require('debug')('koovdev_device');
+const koovdev_error = require('koovdev_error');
 
 /*
  * Device management
@@ -28,34 +29,9 @@ const USB_LIST_ERROR = 0x23;
 const USB_NO_BOOTLOADER = 0x24;
 const USB_WRITE_ERROR = 0x25;
 
-const error_p = (err) => {
-  if (!err)
-    return false;
-  if (typeof err === 'object')
-    return !!err.error;
-  return true;
-};
-
-const make_error = (tag, err) => {
-  if (tag === DEVICE_NO_ERROR ||
-      tag === BLE_NO_ERROR ||
-      tag === USB_NO_ERROR)
-    return err;
-  const original_err = err;
-  if (typeof err === 'string')
-    err = { msg: err };
-  if (typeof err !== 'object' || err === null)
-    err = { msg: 'unknown error' };
-  err.error = true;
-  err.original_error = JSON.stringify(original_err);
-  if (!err.error_code)
-    err.error_code = ((KOOVDEV_DEVICE_ERROR << 8) | tag) & 0xffff;
-  return err;
-};
-
-const error = (tag, err, cb) => {
-  return cb(make_error(tag, err));
-};
+const { error, error_p, make_error } = koovdev_error(KOOVDEV_DEVICE_ERROR, [
+  DEVICE_NO_ERROR, BLE_NO_ERROR, USB_NO_ERROR
+]);
 
 const BLE_OPTS = {
   BTS01: {

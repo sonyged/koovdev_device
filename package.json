@@ -1,6 +1,6 @@
 {
   "name": "koovdev_device",
-  "version": "1.0.88",
+  "version": "1.0.89",
   "description": "koov device management",
   "main": "koovdev_device.js",
   "scripts": {
@@ -10,9 +10,10 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "noble-device": "latest",
-    "debug": "latest",
     "async": "latest",
+    "debug": "latest",
+    "koovdev_error": "file:../koovdev_error",
+    "noble-device": "latest",
     "serialport": "^3.0.0"
   },
   "devDependencies": {
