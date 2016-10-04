@@ -170,6 +170,7 @@ function Device_BTS01(opts)
     });
   };
   this.open = (cb) => {
+    debug(`open: ble`);
     this.open_device((err) => {
       return cb(err);
     });
@@ -186,19 +187,30 @@ function Device_BTS01(opts)
   };
   const reset_koov = (cb) => {
     this.open_device((err) => {
-      debug('reset_koov', err);
-      if (error_p(err))
+      debug('reset_koov: open', err);
+      if (error_p(err)) {
+        debug('reset_koov: exit', err);
         return cb(err);
+      }
       const handler = () => { debug('reset_koov: ignore disconnected'); };
       this.dev.on('disconnect', handler);
       this.listeners.push({ name: 'disconnect', handler: handler });
+      debug('reset_koov: writing 1, 0');
+      /* Hold reset */
       this.dev.writeGPIO(new Buffer([1, 0]), (err) => {
-        debug('reset_koov: write 1, 0', err);
+        debug('reset_koov: wrote 1, 0', err);
         if (err)                // err is BLE error.
           return error(BLE_GPIO_ERROR, err, cb);
+        /* Wait 10ms, then release */
         setTimeout(() => {
+          debug('reset_koov: writing 1, 2', err);
+          /*
+           * The callback of this writeGPIO might not called if
+           * bootloader resets BTS01 immediately.  So, we'll call
+           * close with timeout, and continue the work.
+           */
           this.dev.writeGPIO(new Buffer([1, 2]), (err) => {
-            debug('reset_koov: write 1, 2', err);
+            debug('reset_koov: wrote 1, 2', err);
           });
           setTimeout(() => {
             this.close((err) => {
