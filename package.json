@@ -14,7 +14,8 @@
     "debug": "latest",
     "koovdev_error": "file:../koovdev_error",
     "noble-device": "latest",
-    "serialport": "^3.0.0"
+    "serialport":
+      "git+ssh://git@bitbucket.org/sonyged/node-serialport.git#koov"
   },
   "devDependencies": {
     "nodeunit": "latest",
