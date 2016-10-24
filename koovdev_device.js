@@ -322,8 +322,9 @@ function Device_USB(opts)
     const serialport = require('serialport');
     debug(`open_device: ${this.name}`);
     const sp = new serialport(this.name, {
-      baudrate: 115200,
+      baudrate: 57600,
       autoOpen: false,
+      bufferSize: 1,
       parser: serialport.parsers.raw
     });
     this.serial = sp;
