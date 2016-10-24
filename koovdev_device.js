@@ -321,10 +321,11 @@ function Device_USB(opts)
   this.open_device = (cb) => {
     const serialport = require('serialport');
     debug(`open_device: ${this.name}`);
-    const sp = new serialport.SerialPort(this.name, {
+    const sp = new serialport(this.name, {
       baudrate: 115200,
+      autoOpen: false,
       parser: serialport.parsers.raw
-    }, false);
+    });
     this.serial = sp;
     sp.open((err) => {
       debug(`open_device: ${this.name}:`, err);
@@ -341,8 +342,12 @@ function Device_USB(opts)
      * matter actually, since there is no serial port between host and
      * target M0/M0 pro.
      */
-    var serial_settings = { baudRate: 57600, bufferSize: 1 };
-    var serial = new serialport.SerialPort(this.name, serial_settings, false);
+    const serial_settings = {
+      baudRate: 57600,
+      autoOpen: false,
+      bufferSize: 1
+    };
+    const serial = new serialport(this.name, serial_settings);
     this.serial = serial;
     serial.open((err) => {
       debug('serial open', err);
@@ -368,9 +373,10 @@ function Device_USB(opts)
      * bootloader.
      */
     const openclose = (cb) => {
-      const sp = new serialport.SerialPort(this.name, {
-        baudRate: 1200
-      }, false);
+      const sp = new serialport(this.name, {
+        baudRate: 1200,
+        autoOpen: false
+      });
       sp.open((err) => {
         debug('touch1200: open', err);
         if (err && !err.message.match(/error code 31/)) // err is USB error.
