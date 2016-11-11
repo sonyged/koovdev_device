@@ -430,6 +430,8 @@ function Device_USB(opts)
     });
   };
   this.serial_write = function(data, cb) {
+    if (!this.serial)
+      return error(DEVICE_NO_DEVICE, { msg: 'device is not open' }, cb);
     this.serial.write(data, (err) => {
       return error(err ? USB_WRITE_ERROR : USB_NO_ERROR, err, cb);
     });
