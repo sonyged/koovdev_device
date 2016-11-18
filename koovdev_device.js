@@ -215,7 +215,10 @@ function Device_BTS01(opts)
           setTimeout(() => {
             this.close((err) => {
               debug('reset_koov: close', err);
-              return cb(err);
+              setTimeout(() => {
+                debug('reset_koov: callback', err);
+                return cb(err);
+              }, 100);
             });
           }, 100);
         }, 10);
@@ -309,6 +312,7 @@ function Device_USB(opts)
   this.board = null;
   this.action = null;
   this.serial = null;
+  this.closed = false;
   this.listeners = [];
 
   const cleanup = () => {
@@ -328,8 +332,11 @@ function Device_USB(opts)
       parser: serialport.parsers.raw
     });
     this.serial = sp;
+    this.closed = false;
     sp.open((err) => {
       debug(`open_device: ${this.name}:`, err);
+      if (err)
+        this.serial = null;
       return error(err ? USB_OPEN_ERROR : USB_NO_ERROR, err, cb);
     });
   };
@@ -350,17 +357,26 @@ function Device_USB(opts)
     };
     const serial = new serialport(this.name, serial_settings);
     this.serial = serial;
+    this.closed = false;
     serial.open((err) => {
       debug('serial open', err);
+      if (err)
+        this.serial = null;
       return error(err ? USB_OPEN_ERROR : USB_NO_ERROR, err, cb);
     });
+  };
+  const close_device = (serial, cb) => {
+    if (!serial || this.closed)
+      return cb(null);
+    this.closed = true;
+    serial.close(cb);
   };
   this.close = function(cb) {
     debug('close: usb');
     if (this.serial) {
       const serial = this.serial;
       cleanup();
-      serial.close((err) => {
+      return close_device(serial, (err) => {
         debug('close: serial.close', err);
         return error(USB_NO_ERROR, null, cb);
       });
@@ -380,9 +396,22 @@ function Device_USB(opts)
       });
       sp.open((err) => {
         debug('touch1200: open', err);
-        if (err && !err.message.match(/error code 31/)) // err is USB error.
+        if (err) {
+          debug('touch1200: err.message', err.message);
+          const m = err.message.match(/error code (\d+)/);
+          const ignoreErrors = [
+            '31',                /* USB error */
+            '1167',              /* Device not connected */
+          ];
+          if (m && ignoreErrors.includes(m[1])) {
+            debug('touch1200: ignore error', m);
+            return error(USB_NO_ERROR, null, cb);
+          }
+          debug('touch1200: return error', m);
           return error(USB_OPEN_ERROR, err, cb);
+        }
         sp.close((err) => {
+          debug('touch1200: close', err);
           return error(err ? USB_CLOSE_ERROR : USB_NO_ERROR, err, cb);
         });
       });
@@ -417,14 +446,16 @@ function Device_USB(opts)
     };
     find_bootloader(() => {
       openclose(err => {
+        if (error_p(err))
+          return cb(err);
         times(50, 100, (count, cont) => {
           find_bootloader(() => {
             if (count <= 0)
               return error(USB_NO_BOOTLOADER, {
                 msg: 'no bootloader device found'
               }, cb);
-	    cont();
-	  });
+            cont();
+          });
         });
       });
     });
@@ -433,7 +464,14 @@ function Device_USB(opts)
     if (!this.serial)
       return error(DEVICE_NO_DEVICE, { msg: 'device is not open' }, cb);
     this.serial.write(data, (err) => {
-      return error(err ? USB_WRITE_ERROR : USB_NO_ERROR, err, cb);
+      if (err) {
+        debug('usb.write:', err);
+        return close_device(this.serial, (_) => {
+          debug('usb.write: close', _);
+          return error(USB_WRITE_ERROR, err, cb);
+        });
+      }
+      return error(USB_NO_ERROR, err, cb);
     });
   };
   this.on = function(what, cb) {
