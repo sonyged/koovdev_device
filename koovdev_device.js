@@ -407,6 +407,10 @@ function Device_USB(opts)
             debug('touch1200: ignore error', m);
             return error(USB_NO_ERROR, null, cb);
           }
+          if (err.message.match(/File not found/)) {
+            debug('touch1200: ignore file not found');
+            return error(USB_NO_ERROR, null, cb);
+          }
           debug('touch1200: return error', m);
           return error(USB_OPEN_ERROR, err, cb);
         }
