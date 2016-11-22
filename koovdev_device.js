@@ -397,22 +397,14 @@ function Device_USB(opts)
       sp.open((err) => {
         debug('touch1200: open', err);
         if (err) {
-          debug('touch1200: err.message', err.message);
-          const m = err.message.match(/error code (\d+)/);
-          const ignoreErrors = [
-            '31',                /* USB error */
-            '1167',              /* Device not connected */
-          ];
-          if (m && ignoreErrors.includes(m[1])) {
-            debug('touch1200: ignore error', m);
-            return error(USB_NO_ERROR, null, cb);
-          }
-          if (err.message.match(/File not found/)) {
-            debug('touch1200: ignore file not found');
-            return error(USB_NO_ERROR, null, cb);
-          }
-          debug('touch1200: return error', m);
-          return error(USB_OPEN_ERROR, err, cb);
+          /*
+           * Since device reboots, further USB transaction from host
+           * will result an error.  We ignore this error since usually
+           * device turns into bootloader mode.  We will get timeout
+           * if device fails to switch to bootloader.
+           */
+          debug('touch1200: ignore error:', err.message);
+          return error(USB_NO_ERROR, null, cb);
         }
         sp.close((err) => {
           debug('touch1200: close', err);
