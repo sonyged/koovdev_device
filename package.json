@@ -1,6 +1,6 @@
 {
   "name": "koovdev_device",
-  "version": "1.0.105",
+  "version": "1.0.106",
   "description": "koov device management",
   "main": "koovdev_device.js",
   "scripts": {
@@ -15,7 +15,7 @@
     "koovdev_error": "file:../../../srv/vendor/npms/koovdev_error",
     "noble-device": "latest",
     "serialport":
-      "https://github.com/enami/node-serialport.git#plug_handle_leak_on_windows"
+      "git+ssh://git@bitbucket.org/sonyged/node-serialport.git#koov-1_0_4"
   },
   "devDependencies": {
     "nodeunit": "latest",
