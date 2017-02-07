@@ -353,7 +353,7 @@ function Device_USB(opts)
     const serial_settings = {
       baudRate: 57600,
       autoOpen: false,
-      bufferSize: 1
+      bufferSize: 64
     };
     const serial = new serialport(this.name, serial_settings);
     this.serial = serial;
