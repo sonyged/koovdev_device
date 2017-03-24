@@ -2,7 +2,7 @@
  */
 
 'use strict';
-const debug = require('debug')('koovdev_device');
+var debug = require('debug')('koovdev_device');
 const koovdev_error = require('koovdev_error');
 
 /*
@@ -33,53 +33,7 @@ const { error, error_p, make_error } = koovdev_error(KOOVDEV_DEVICE_ERROR, [
   DEVICE_NO_ERROR, BLE_NO_ERROR, USB_NO_ERROR
 ]);
 
-const BLE_OPTS = {
-  BTS01: {
-    service_id: '55df0001a9b011e3a5e2000190f08f1e',
-    characteristic_tx: '55df0002a9b011e3a5e2000190f08f1e',
-    characteristic_rx: '55df0003a9b011e3a5e2000190f08f1e'
-  },
-  BTS01_GPIO: {
-    service_id: '55df0001a9b011e3a5e2000190f08f1e',
-    characteristic_tx: '55df8001a9b011e3a5e2000190f08f1e',
-    characteristic_rx: '55df8001a9b011e3a5e2000190f08f1e'
-  }
-};
-
-const KoovBle = (() => {
-  if (process.platform === 'win32') {
-    return null;
-  }
-  const noble_device = require('noble-device');
-  let ble = function(peripheral) {
-    noble_device.call(this, peripheral);
-  };
-  ble.SCAN_UUIDS = [BLE_OPTS.BTS01.service_id];
-  noble_device.Util.inherits(ble, noble_device);
-  ble.prototype.writeGPIO = function(data, done) {
-    this.writeDataCharacteristic(BLE_OPTS.BTS01_GPIO.service_id,
-                                 BLE_OPTS.BTS01_GPIO.characteristic_tx,
-                                 data, done);
-  };
-  ble.prototype.readGPIO = function(done) {
-    this.readDataCharacteristic(BLE_OPTS.BTS01_GPIO.service_id,
-                                BLE_OPTS.BTS01_GPIO.characteristic_rx,
-                                done);
-  };
-  ble.prototype.write = function(data, done) {
-    this.writeDataCharacteristic(BLE_OPTS.BTS01.service_id,
-                                 BLE_OPTS.BTS01.characteristic_tx,
-                                 data, done);
-  };
-  ble.prototype.read = function(done) {
-    this.notifyCharacteristic(BLE_OPTS.BTS01.service_id,
-                              BLE_OPTS.BTS01.characteristic_rx,
-                              true, done, function(err) {
-                                debug('notify callback', err);
-                              });
-  };
-  return ble;
-})();
+var KoovBle = undefined;
 
 function Device_BTS01(opts)
 {
@@ -101,7 +55,7 @@ function Device_BTS01(opts)
   this.listeners = [];
   this.write_callback = null;
 
-  const ble_opts = BLE_OPTS.BTS01;
+  const ble_opts = KoovBle.BLE_OPTS.BTS01;
   const done = (err) => {
     if (this.write_callback) {
       const callback = this.write_callback;
@@ -260,6 +214,10 @@ function scan_ble(cb, timeout) {
     cb('ble', null, []);
     return;
   }
+  if (!KoovBle) {
+    cb('ble', null, []);
+    return;
+  }
 
   debug('scan ble', timeout);
 
@@ -286,6 +244,7 @@ function scan_ble(cb, timeout) {
 const is_koovdev = x => {
   debug(`is_koovdev`, x);
   return x.vendorId === '0x054c' && x.productId === '0x0be6' ||
+    x.vendorId === '0x54c' && x.productId === '0xbe6' ||
     (x.pnpId && x.pnpId.match(/VID_054C&PID_0BE6/));
 };
 
@@ -295,6 +254,7 @@ const is_koovdev = x => {
 const is_bootdev = x => {
   debug(`is_bootdev`, x);
   return x.vendorId === '0x054c' && x.productId === '0x0bdc' ||
+    x.vendorId === '0x54c' && x.productId === '0xbdc' ||
     (x.pnpId && x.pnpId.match(/VID_054C&PID_0BDC/));
 };
 
@@ -302,6 +262,8 @@ const device_id = (() => {
   let id = 0;
   return () => { return id++; };
 })();
+
+var KoovSerialPort = undefined;
 
 function Device_USB(opts)
 {
@@ -323,13 +285,12 @@ function Device_USB(opts)
     this.serial = null;
   };
   this.open_device = (cb) => {
-    const serialport = require('serialport');
     debug(`open_device: ${this.name}`);
-    const sp = new serialport(this.name, {
+    const sp = new KoovSerialPort(this.name, {
       baudrate: 57600,
       autoOpen: false,
       bufferSize: 1,
-      parser: serialport.parsers.raw
+      parser: KoovSerialPort.parsers.raw
     });
     this.serial = sp;
     this.closed = false;
@@ -344,7 +305,6 @@ function Device_USB(opts)
     debug('usb open');
     if (is_bootdev(this.dev))
       return cb('cannot open in bootloader mode');
-    var serialport = require('serialport');
     /*
      * Settings copied from firmata.js.  The value of baudrate doesn't
      * matter actually, since there is no serial port between host and
@@ -355,7 +315,7 @@ function Device_USB(opts)
       autoOpen: false,
       bufferSize: 1
     };
-    const serial = new serialport(this.name, serial_settings);
+    const serial = new KoovSerialPort(this.name, serial_settings);
     this.serial = serial;
     this.closed = false;
     serial.open((err) => {
@@ -384,13 +344,12 @@ function Device_USB(opts)
       return error(USB_NO_ERROR, null, cb);
   };
   const touch1200 = (cb) => {
-    const serialport = require('serialport');
     /*
      * Open device with 1200 baud and close to put device into
      * bootloader.
      */
     const openclose = (cb) => {
-      const sp = new serialport(this.name, {
+      const sp = new KoovSerialPort(this.name, {
         baudRate: 1200,
         autoOpen: false
       });
@@ -416,7 +375,7 @@ function Device_USB(opts)
      * List serial device file and find bootloader in it.
      */
     const find_bootloader = (cont) => {
-      serialport.list((err, ports) => {
+      KoovSerialPort.list((err, ports) => {
         if (err)                // err is USB error.
           return error(USB_LIST_ERROR, err, cb);
         const port = ports.find(is_bootdev);
@@ -480,13 +439,14 @@ function Device_USB(opts)
 
 function scan_usb(cb, timeout)
 {
-  var sp = require('serialport');
+  var sp = KoovSerialPort;
   debug('scan usb');
   sp.list((err, ports) => {
     var devs = ports.reduce((acc, x) => {
       debug('scan found', x);
       const found = [
         /^.dev.(tty|cu).usb.*/,
+        /^.dev.ttyACM.*/,
         //spaces between '1,' and '3' caused unexpected result.
         /COM[0-9]{1,3}/
       ].some(re => {
@@ -602,6 +562,11 @@ function Device()
   this.serial_write = function(data, cb) {
     if (!this.device)
       return error(DEVICE_NO_DEVICE, { msg: 'device is not found' }, cb);
+    if (typeof data === 'object') {
+      if (data.type && data.type == 'Buffer') {
+        data = data.data;
+      }
+    }
     this.device.serial_write(data, (err) => {
       //debug('device.serial_write: done', err, data);
       cb(err);
@@ -610,8 +575,12 @@ function Device()
   this.serial_event = function(what, cb, notify) {
     if (!this.device)
       return error(DEVICE_NO_DEVICE, { msg: 'device is not open' }, cb);
-    this.device.on(what.substring('serial-event:'.length), (arg) => {
+    let shortwhat = what.substring('serial-event:'.length);
+    this.device.on(shortwhat, (arg) => {
       debug(`${what}:`, arg);
+      if (shortwhat == 'data' && typeof arg === 'object') {
+        arg = Array.from(arg);
+      }
       notify(arg);
     });
     return error(DEVICE_NO_ERROR, null, cb);
@@ -628,7 +597,11 @@ function Device()
 
 let device = new Device();
 module.exports = {
-  device: function() {
+  device: function(opts) {
+    if (opts.debug)
+      debug = opts.debug
+    KoovSerialPort = opts.serialport;
+    KoovBle = opts.ble;
     return device;
   }
 };

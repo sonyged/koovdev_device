@@ -1,6 +1,6 @@
 {
   "name": "koovdev_device",
-  "version": "1.0.110",
+  "version": "1.0.111",
   "description": "koov device management",
   "main": "koovdev_device.js",
   "scripts": {
@@ -12,10 +12,7 @@
   "dependencies": {
     "async": "latest",
     "debug": "latest",
-    "koovdev_error": "file:../../../srv/vendor/npms/koovdev_error",
-    "noble-device": "latest",
-    "serialport":
-      "git+ssh://git@bitbucket.org/sonyged/node-serialport.git#koov-1_0_4"
+    "koovdev_error": "file:../../../srv/vendor/npms/koovdev_error"
   },
   "devDependencies": {
     "nodeunit": "latest",
