@@ -28,6 +28,7 @@ const USB_CLOSE_ERROR = 0x22;
 const USB_LIST_ERROR = 0x23;
 const USB_NO_BOOTLOADER = 0x24;
 const USB_WRITE_ERROR = 0x25;
+const USB_UNEXPECTED_BOOTLOADER = 0x26;
 
 const { error, error_p, make_error } = koovdev_error(KOOVDEV_DEVICE_ERROR, [
   DEVICE_NO_ERROR, BLE_NO_ERROR, USB_NO_ERROR
@@ -304,7 +305,9 @@ function Device_USB(opts)
   this.open = function(cb) {
     debug('usb open');
     if (is_bootdev(this.dev))
-      return cb('cannot open in bootloader mode');
+      return error(USB_UNEXPECTED_BOOTLOADER, {
+        msg: 'cannot open in bootloader mode'
+      }, cb);
     /*
      * Settings copied from firmata.js.  The value of baudrate doesn't
      * matter actually, since there is no serial port between host and
