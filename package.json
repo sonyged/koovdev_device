@@ -1,6 +1,6 @@
 {
   "name": "koovdev_device",
-  "version": "1.0.123",
+  "version": "1.0.124",
   "description": "koov device management",
   "main": "koovdev_device.js",
   "scripts": {
@@ -12,7 +12,7 @@
   "dependencies": {
     "async": "latest",
     "debug": "latest",
-    "koovdev_error": "file:../../../srv/vendor/npms/koovdev_error"
+    "koovdev_error": "git+ssh://git@bitbucket.org/sonyged/koovdev_error.git"
   },
   "devDependencies": {
     "nodeunit": "latest",
