@@ -135,7 +135,15 @@ function Device_BTS01(opts)
     if (this.serial) {
       const serial = this.serial;
       cleanup();
-      serial.close((err) => { cb(err); });
+      serial.close((err) => {
+        /*
+         * Give web bluetooth worker thread chance to run.
+         */
+        const timo = 100;
+        return setTimeout(() => {
+          return cb(err);
+        }, timo);
+      });
     } else {
       return error(BLE_NO_ERROR, null, cb);
     }
@@ -147,7 +155,21 @@ function Device_BTS01(opts)
         debug('reset_koov: exit', err);
         return cb(err);
       }
-      const handler = () => { debug('reset_koov: ignore disconnected'); };
+      let timeoutId = null;
+      const close_device = () => {
+        this.close((err) => {
+          debug('reset_koov: close', err);
+          return setTimeout(() => {
+            debug('reset_koov: callback', err);
+            return cb(err);
+          }, 1000);
+        });
+      };
+      const handler = () => {
+        debug('reset_koov: disconnected');
+        clearTimeout(timeoutId);
+        setTimeout(close_device, 1000);
+      };
       this.dev.on('disconnect', handler);
       this.listeners.push({ name: 'disconnect', handler: handler });
       debug('reset_koov: writing 1, 0');
@@ -156,7 +178,7 @@ function Device_BTS01(opts)
         debug('reset_koov: wrote 1, 0', err);
         if (err)                // err is BLE error.
           return error(BLE_GPIO_ERROR, err, cb);
-        /* Wait 10ms, then release */
+        /* Wait 1s, then release */
         setTimeout(() => {
           debug('reset_koov: writing 1, 2', err);
           /*
@@ -167,15 +189,7 @@ function Device_BTS01(opts)
           this.dev.writeGPIO(new Buffer([1, 2]), (err) => {
             debug('reset_koov: wrote 1, 2', err);
           });
-          setTimeout(() => {
-            this.close((err) => {
-              debug('reset_koov: close', err);
-              setTimeout(() => {
-                debug('reset_koov: callback', err);
-                return cb(err);
-              }, 100);
-            });
-          }, 100);
+          timeoutId = setTimeout(close_device, 10000);
         }, 1000);
       });
     });
@@ -210,7 +224,7 @@ function Device_BTS01(opts)
   };
 }
 
-function scan_ble(cb, timeout) {
+function scan_ble(cb, timeout, oneshot) {
   if (process.platform == 'win32') {
     cb('ble', null, []);
     return;
@@ -223,20 +237,37 @@ function scan_ble(cb, timeout) {
   debug('scan ble', timeout);
 
   let found = [];
+  let timeoutId = null;
+  const finish = () => {
+    if (timeoutId)
+      clearTimeout(timeoutId);
+    KoovBle.emitter.removeListener('error', errorCallback);
+    KoovBle.emitter.removeListener('scanStop', scanStopCallback);
+    KoovBle.stopDiscoverAll(discoverCallback);
+    cb('ble', null, found.sort((a, b) => {
+      return a.dev.id < b.dev.id ? -1 : a.dev.id > b.dev.id ? 1 : 0;
+    }).map(x => new Device_BTS01(x)));
+  };
   const discoverCallback = dev => {
     debug('discoverAll', dev);
     const name = dev._peripheral.advertisement.localName;
     if (!found.find(x => x.dev.id === dev.id))
       found.push({ name: name, dev: dev, periph: dev._peripheral });
+    if (oneshot)
+      return finish();
+  };
+  const scanStopCallback = () => {
+    debug('KoovBle: scanStop');
+  };
+  const errorCallback = (err) => {
+    debug('KoovBle: errorCallback', err);
+    return finish();
   };
   KoovBle.discoverAll(discoverCallback);
+  KoovBle.emitter.on('scanStop', scanStopCallback);
+  KoovBle.emitter.on('error', errorCallback);
 
-  setTimeout(() => {
-    KoovBle.stopDiscoverAll(discoverCallback);
-    cb('ble', null, found.sort((a, b) => {
-      return a.dev.id < b.dev.id ? -1 : a.dev.id > b.dev.id ? 1 : 0;
-    }).map(x => new Device_BTS01(x)));
-  }, timeout);
+  timeoutId = setTimeout(finish, timeout);
 }
 
 /*
@@ -440,7 +471,7 @@ function Device_USB(opts)
   this.reset_koov = touch1200;
 }
 
-function scan_usb(cb, timeout)
+function scan_usb(cb, timeout, oneshot)
 {
   var sp = KoovSerialPort;
   debug('scan usb');
@@ -488,9 +519,13 @@ function Device()
       { type: 'ble', done: false, error: null, result: [] },
       { type: 'usb', done: false, error: null, result: [] }
     ];
-    this.start_scan = (cb, timeout) => {
-      if (!timeout)
-        timeout = 1000;
+    this.start_scan = (cb, arg) => {
+      if (!arg)
+        arg = {};
+      else if (typeof arg === 'number')
+        arg = { timeout: arg };
+      const timeout = arg.timeout || 10000;
+      const targets = arg.targets || [ 'ble', 'usb' ];
       const callback = (type, err, result) => {
         let x = complete.find(x => x.type === type);
 
@@ -507,12 +542,18 @@ function Device()
       };
 
       complete.forEach(x => {
-        x.done = false;
+        x.done = !targets.includes(x.type);
         x.error = null;
         x.result = [];
       });
-      scan_ble(callback, timeout);
-      scan_usb(callback, timeout);
+
+      const scanners = {
+        ble: scan_ble,
+        usb: scan_usb
+      };
+      return targets.forEach(type => {
+        return scanners[type](callback, timeout, arg.oneshot);
+      });
     };
     this.stop_scan = function() {
     };
@@ -584,7 +625,9 @@ function Device()
       if (shortwhat == 'data' && typeof arg === 'object') {
         arg = Array.from(arg);
       }
-      notify(arg);
+      return setTimeout(() => {
+        return notify(arg);
+      }, 0);
     });
     return error(DEVICE_NO_ERROR, null, cb);
   };
