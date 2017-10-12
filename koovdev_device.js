@@ -79,6 +79,8 @@ function Device_BTS01(opts)
     }
     this.serial = {
       close: (cb) => {
+        if (this.dev._peripheral.state === 'disconnected')
+          return error(BLE_NO_ERROR, null, cb);
         this.dev.disconnect((err) => {
           return error(err ? BLE_DISCONNECT_ERROR : BLE_NO_ERROR, err, cb);
         });
