@@ -233,10 +233,6 @@ function Device_BTS01(opts)
 }
 
 function scan_ble(cb, timeout) {
-  if (process.platform == 'win32') {
-    cb('ble', null, []);
-    return;
-  }
   if (!KoovBle) {
     cb('ble', null, []);
     return;
