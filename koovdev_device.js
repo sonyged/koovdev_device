@@ -43,6 +43,7 @@ const BLE_DISCONNECT_ERROR = 0x12;
 const BLE_CONNECT_ERROR = 0x13;
 const BLE_GPIO_ERROR = 0x14;
 const BLE_NO_DEVICE = 0x15;
+const BLE_DEVICE_NOT_PAIRED = 0x16;
 
 const USB_NO_ERROR = 0x20;
 const USB_OPEN_ERROR = 0x21;
@@ -143,12 +144,21 @@ function Device_BTS01(opts)
     };
     this.dev.connectAndSetUp((err) => {
       debug(`connectAndSetUp: ${err}`);
-      return error(err ? BLE_CONNECT_ERROR : BLE_NO_ERROR, err, cb);
+      const ecode = (() => {
+        if (!err)
+          return BLE_NO_ERROR;
+        if (typeof err === 'object' && err.deviceNotPaired)
+          return BLE_DEVICE_NOT_PAIRED;
+        return BLE_CONNECT_ERROR;
+      })();
+      return error(ecode, err, cb);
     });
   };
   this.open = (cb) => {
     debug(`open: ble`);
     this.open_device((err) => {
+      if (error_p(err))
+        this.serial = null;
       return cb(err);
     });
   };
@@ -507,8 +517,10 @@ function Device()
       { type: 'usb', done: false, error: null, result: [] }
     ];
     this.start_scan = (cb, timeout) => {
-      if (!timeout)
+      if (!timeout || typeof timeout !== 'object' || !timeout.timeout)
         timeout = 1000;
+      else
+        timeout = timeout.timeout;
       const callback = (type, err, result) => {
         let x = complete.find(x => x.type === type);
 
