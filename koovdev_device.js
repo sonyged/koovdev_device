@@ -102,8 +102,10 @@ function Device_BTS01(opts)
     }
     this.serial = {
       close: (cb) => {
-        this.dev.disconnect((err) => {
-          return error(err ? BLE_DISCONNECT_ERROR : BLE_NO_ERROR, err, cb);
+        this.dev.stopReading(() => {
+          this.dev.disconnect((err) => {
+            return error(err ? BLE_DISCONNECT_ERROR : BLE_NO_ERROR, err, cb);
+          });
         });
       },
       write: (data, cb) => {
