@@ -511,8 +511,10 @@ function Device()
       { type: 'usb', done: false, error: null, result: [] }
     ];
     this.start_scan = (cb, timeout) => {
-      if (!timeout)
+      if (!timeout || typeof timeout !== 'object' || !timeout.timeout)
         timeout = 1000;
+      else
+        timeout = timeout.timeout;
       const callback = (type, err, result) => {
         let x = complete.find(x => x.type === type);
 
