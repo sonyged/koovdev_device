@@ -43,6 +43,7 @@ const BLE_DISCONNECT_ERROR = 0x12;
 const BLE_CONNECT_ERROR = 0x13;
 const BLE_GPIO_ERROR = 0x14;
 const BLE_NO_DEVICE = 0x15;
+const BLE_DEVICE_NOT_PAIRED = 0x16;
 
 const USB_NO_ERROR = 0x20;
 const USB_OPEN_ERROR = 0x21;
@@ -101,8 +102,10 @@ function Device_BTS01(opts)
     }
     this.serial = {
       close: (cb) => {
-        this.dev.disconnect((err) => {
-          return error(err ? BLE_DISCONNECT_ERROR : BLE_NO_ERROR, err, cb);
+        this.dev.stopReading(() => {
+          this.dev.disconnect((err) => {
+            return error(err ? BLE_DISCONNECT_ERROR : BLE_NO_ERROR, err, cb);
+          });
         });
       },
       write: (data, cb) => {
@@ -143,12 +146,21 @@ function Device_BTS01(opts)
     };
     this.dev.connectAndSetUp((err) => {
       debug(`connectAndSetUp: ${err}`);
-      return error(err ? BLE_CONNECT_ERROR : BLE_NO_ERROR, err, cb);
+      const ecode = (() => {
+        if (!err)
+          return BLE_NO_ERROR;
+        if (typeof err === 'object' && err.deviceNotPaired)
+          return BLE_DEVICE_NOT_PAIRED;
+        return BLE_CONNECT_ERROR;
+      })();
+      return error(ecode, err, cb);
     });
   };
   this.open = (cb) => {
     debug(`open: ble`);
     this.open_device((err) => {
+      if (error_p(err))
+        this.serial = null;
       return cb(err);
     });
   };
@@ -233,10 +245,6 @@ function Device_BTS01(opts)
 }
 
 function scan_ble(cb, timeout) {
-  if (process.platform == 'win32') {
-    cb('ble', null, []);
-    return;
-  }
   if (!KoovBle) {
     cb('ble', null, []);
     return;
