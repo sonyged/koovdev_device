@@ -1,7 +1,7 @@
 /* -*- indent-tabs-mode: nil; js-indent-level: 2 -*-
- *
+ * 
  * Copyright (c) 2017 Sony Global Education, Inc.
- *
+ * 
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
  * files (the "Software"), to deal in the Software without
@@ -9,10 +9,10 @@
  * modify, merge, publish, distribute, sublicense, and/or sell copies
  * of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
- *
+ * 
  * The above copyright notice and this permission notice shall be
  * included in all copies or substantial portions of the Software.
- *
+ * 
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
  * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
  * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -274,8 +274,8 @@ function scan_ble(cb, timeout) {
  */
 const is_koovdev = x => {
   debug(`is_koovdev`, x);
-  return x.vendorId === '054c' && x.productId === '0be6' ||
-    x.vendorId === '54c' && x.productId === 'be6' ||
+  return x.vendorId === '0x054c' && x.productId === '0x0be6' ||
+    x.vendorId === '0x54c' && x.productId === '0xbe6' ||
     (x.pnpId && x.pnpId.match(/VID_054C&PID_0BE6/));
 };
 
@@ -284,8 +284,8 @@ const is_koovdev = x => {
  */
 const is_bootdev = x => {
   debug(`is_bootdev`, x);
-  return x.vendorId === '054c' && x.productId === '0bdc' ||
-    x.vendorId === '54c' && x.productId === 'bdc' ||
+  return x.vendorId === '0x054c' && x.productId === '0x0bdc' ||
+    x.vendorId === '0x54c' && x.productId === '0xbdc' ||
     (x.pnpId && x.pnpId.match(/VID_054C&PID_0BDC/));
 };
 
@@ -408,7 +408,7 @@ function Device_USB(opts)
      * List serial device file and find bootloader in it.
      */
     const find_bootloader = (cont) => {
-      KoovSerialPort.list().then((ports, err) => {
+      KoovSerialPort.list((err, ports) => {
         if (err)                // err is USB error.
           return error(USB_LIST_ERROR, err, cb);
         const port = ports.find(is_bootdev);
@@ -474,7 +474,7 @@ function scan_usb(cb, timeout)
 {
   var sp = KoovSerialPort;
   debug('scan usb');
-  sp.list().then((ports, err) => {
+  sp.list((err, ports) => {
     var devs = ports.reduce((acc, x) => {
       debug('scan found', x);
       const found = [
