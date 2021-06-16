@@ -628,6 +628,19 @@ function Device()
   this.action = function() {
     return this.device ? this.device.action : null;
   };
+  this.discoverBleCallback = dev => {
+    debug('discoverAll', dev);
+    const name = dev._peripheral.advertisement.localName;
+    this.candidates = [
+      new Device_BTS01({ name: name, dev: dev, periph: dev._peripheral })];
+    KoovBle.stopDiscoverAll(this.discoverBleCallback);
+  };
+  this.request_ble_device = function() {
+    debug('request_ble_device', this);
+    this.candidates = [];
+    KoovBle.stopDiscoverAll(this.discoverBleCallback);
+    KoovBle.discoverAll(this.discoverBleCallback);
+  };
 };
 
 let device = new Device();
