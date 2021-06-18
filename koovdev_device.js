@@ -628,18 +628,29 @@ function Device()
   this.action = function() {
     return this.device ? this.device.action : null;
   };
+
+  //
+  // Following code is only for web bluetooth.
+  //
+  this.request_ble_device_cb = undefined;
   this.discoverBleCallback = dev => {
-    debug('discoverAll', dev);
+    debug('discoverBleCallback', dev);
+    const cb = this.request_ble_device_cb || (() => {});
+    this.request_ble_device_cb = undefined;
+    if (dev instanceof DOMException) {
+      cb(dev);
+      return;
+    }
     const name = dev._peripheral.advertisement.localName;
     this.candidates = [
       new Device_BTS01({ name: name, dev: dev, periph: dev._peripheral })];
-    KoovBle.stopDiscoverAll(this.discoverBleCallback);
+    cb(this.list()[0]);
   };
-  this.request_ble_device = function() {
+  this.request_ble_device = function(cb) {
     debug('request_ble_device', this);
     this.candidates = [];
-    KoovBle.stopDiscoverAll(this.discoverBleCallback);
-    KoovBle.discoverAll(this.discoverBleCallback);
+    this.request_ble_device_cb = cb;
+    KoovBle.requestDevice(this.discoverBleCallback);
   };
 };
 
