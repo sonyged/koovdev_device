@@ -652,6 +652,9 @@ function Device()
     this.request_ble_device_cb = cb;
     KoovBle.requestDevice(this.discoverBleCallback);
   };
+  this.request_serial_device = function(cb) {
+    KoovSerialPort.requestDevice(false, cb);
+  };
 };
 
 let device = new Device();
