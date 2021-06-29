@@ -408,7 +408,7 @@ function Device_USB(opts)
      * List serial device file and find bootloader in it.
      */
     const find_bootloader = (cont) => {
-      KoovSerialPort.list((err, ports) => {
+      (KoovSerialPort.listBootDevice || KoovSerialPort.list)((err, ports) => {
         if (err)                // err is USB error.
           return error(USB_LIST_ERROR, err, cb);
         const port = ports.find(is_bootdev);
