@@ -652,8 +652,27 @@ function Device()
     this.request_ble_device_cb = cb;
     KoovBle.requestDevice(this.discoverBleCallback);
   };
+
+  //
+  // Following code is only for web serial.
+  //
+  this.request_serial_device_cb = undefined;
+  this.serialRequestDeviceCallback = (dev) => {
+    debug('serialRequestDeviceCallback', dev);
+    const cb = this.request_serial_device_cb || (() => {});
+    this.request_serial_device_cb = undefined;
+    if (dev instanceof DOMException) {
+      cb(dev);
+      return;
+    }
+    this.candidates = [
+      new Device_USB({ name: dev.name, dev: dev })];
+    cb(this.list()[0]);
+  };
   this.request_serial_device = function(cb) {
-    KoovSerialPort.requestDevice(false, cb);
+    this.candidates = [];
+    this.request_serial_device_cb = cb;
+    KoovSerialPort.requestDevice(false, this.serialRequestDeviceCallback);
   };
 };
 
