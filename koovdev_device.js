@@ -666,7 +666,7 @@ function Device()
       return;
     }
     this.candidates = [
-      new Device_USB({ name: dev.name, dev: dev })];
+      new Device_USB({ name: dev.comName, dev: dev })];
     cb(this.list()[0]);
   };
   this.request_serial_device = function(cb) {
