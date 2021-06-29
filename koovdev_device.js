@@ -669,10 +669,12 @@ function Device()
       new Device_USB({ name: dev.comName, dev: dev })];
     cb(this.list()[0]);
   };
-  this.request_serial_device = function(cb) {
+  this.request_serial_device = function(allowBootDevice, cb) {
+    debug('request_serial_device', allowBootDevice, cb, new Error());
     this.candidates = [];
     this.request_serial_device_cb = cb;
-    KoovSerialPort.requestDevice(false, this.serialRequestDeviceCallback);
+    KoovSerialPort.requestDevice(
+      false, allowBootDevice, this.serialRequestDeviceCallback);
   };
 };
 
