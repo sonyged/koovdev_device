@@ -670,7 +670,7 @@ function Device()
     cb(this.list()[0]);
   };
   this.request_serial_device = function(allowBootDevice, cb) {
-    debug('request_serial_device', allowBootDevice, cb, new Error());
+    debug('request_serial_device', allowBootDevice, cb);
     this.candidates = [];
     this.request_serial_device_cb = cb;
     KoovSerialPort.requestDevice(
