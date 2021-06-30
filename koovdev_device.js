@@ -633,8 +633,8 @@ function Device()
   // Following code is only for web bluetooth.
   //
   this.request_ble_device_cb = undefined;
-  this.discoverBleCallback = dev => {
-    debug('discoverBleCallback', dev);
+  this.requestBleDeviceCallback = dev => {
+    debug('requestBleDeviceCallback', dev);
     const cb = this.request_ble_device_cb || (() => {});
     this.request_ble_device_cb = undefined;
     if (dev instanceof DOMException) {
@@ -650,15 +650,15 @@ function Device()
     debug('request_ble_device', this);
     this.candidates = [];
     this.request_ble_device_cb = cb;
-    KoovBle.requestDevice(this.discoverBleCallback);
+    KoovBle.requestDevice(this.requestBleDeviceCallback);
   };
 
   //
   // Following code is only for web serial.
   //
   this.request_serial_device_cb = undefined;
-  this.serialRequestDeviceCallback = (dev) => {
-    debug('serialRequestDeviceCallback', dev);
+  this.requestSerialDeviceCallback = (dev) => {
+    debug('requestSerialDeviceCallback', dev);
     const cb = this.request_serial_device_cb || (() => {});
     this.request_serial_device_cb = undefined;
     if (dev instanceof DOMException) {
@@ -674,7 +674,7 @@ function Device()
     this.candidates = [];
     this.request_serial_device_cb = cb;
     KoovSerialPort.requestDevice(
-      false, allowBootDevice, this.serialRequestDeviceCallback);
+      false, allowBootDevice, this.requestSerialDeviceCallback);
   };
 };
 
