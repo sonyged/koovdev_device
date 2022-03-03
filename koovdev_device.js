@@ -294,6 +294,13 @@ const device_id = (() => {
   return () => { return id++; };
 })();
 
+const port_name = (port) => {
+  debug('port_name', port);
+  if (port.path)
+    return port.path;
+  return port.comName;
+};
+
 var KoovSerialPort = undefined;
 
 function Device_USB(opts)
@@ -413,7 +420,7 @@ function Device_USB(opts)
           return error(USB_LIST_ERROR, err, cb);
         const port = ports.find(is_bootdev);
         if (port) {
-          let name = port.comName;
+          const name = port_name(port);
           debug(`switch device from ${this.name} to ${name}`);
           this.name = name;
           // Add small delay after finding bootloader device.  OSX
@@ -483,11 +490,11 @@ function scan_usb(cb, timeout)
         //spaces between '1,' and '3' caused unexpected result.
         /COM[0-9]{1,3}/
       ].some(re => {
-        return x.comName.match(re) &&
+        return port_name(x).match(re) &&
           (is_koovdev(x) || is_bootdev(x));
       });
       if (found)
-        acc.push(new Device_USB({ name: x.comName, dev: x }));
+        acc.push(new Device_USB({ name: port_name(x), dev: x }));
       return acc;
     }, []);
 
