@@ -415,7 +415,7 @@ function Device_USB(opts)
      * List serial device file and find bootloader in it.
      */
     const find_bootloader = (cont) => {
-      KoovSerialPort.list((err, ports) => {
+      (KoovSerialPort.listBootDevice || KoovSerialPort.list)((err, ports) => {
         if (err)                // err is USB error.
           return error(USB_LIST_ERROR, err, cb);
         const port = ports.find(is_bootdev);
@@ -634,6 +634,54 @@ function Device()
   };
   this.action = function() {
     return this.device ? this.device.action : null;
+  };
+
+  //
+  // Following code is only for web bluetooth.
+  //
+  this.request_ble_device_cb = undefined;
+  this.requestBleDeviceCallback = dev => {
+    debug('requestBleDeviceCallback', dev);
+    const cb = this.request_ble_device_cb || (() => {});
+    this.request_ble_device_cb = undefined;
+    if (dev instanceof DOMException) {
+      cb(dev);
+      return;
+    }
+    const name = dev._peripheral.advertisement.localName;
+    this.candidates = [
+      new Device_BTS01({ name: name, dev: dev, periph: dev._peripheral })];
+    cb(this.list()[0]);
+  };
+  this.request_ble_device = function(cb) {
+    debug('request_ble_device', this);
+    this.candidates = [];
+    this.request_ble_device_cb = cb;
+    KoovBle.requestDevice(this.requestBleDeviceCallback);
+  };
+
+  //
+  // Following code is only for web serial.
+  //
+  this.request_serial_device_cb = undefined;
+  this.requestSerialDeviceCallback = (dev) => {
+    debug('requestSerialDeviceCallback', dev);
+    const cb = this.request_serial_device_cb || (() => {});
+    this.request_serial_device_cb = undefined;
+    if (dev instanceof DOMException) {
+      cb(dev);
+      return;
+    }
+    this.candidates = [
+      new Device_USB({ name: dev.comName, dev: dev })];
+    cb(this.list()[0]);
+  };
+  this.request_serial_device = function(allowBootDevice, cb) {
+    debug('request_serial_device', allowBootDevice, cb);
+    this.candidates = [];
+    this.request_serial_device_cb = cb;
+    KoovSerialPort.requestDevice(
+      false, allowBootDevice, this.requestSerialDeviceCallback);
   };
 };
 
