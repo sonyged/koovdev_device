@@ -12,7 +12,7 @@
   "dependencies": {
     "async": "latest",
     "debug": "latest",
-    "koovdev_error": "https://github.com/sonyged/koovdev_error.git#c2ba353f2bd4296a5a76de492968f5feba943df3"
+    "koovdev_error": "https://github.com/sonyged/koovdev_error.git#6a66a483edfa8c692d46cb7841097add69aa619c"
   },
   "devDependencies": {
     "nodeunit": "latest",
